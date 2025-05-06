@@ -22,16 +22,14 @@ const products: Product[] = [
 
 
 export async function getProducts(event: any) {
-     return {
-            body: JSON.stringify({products}),
-            statusCode: 200,
-        };
+    console.log("Received event for GetProducts:", JSON.stringify(event, null, 2));
+     return products
 }
 
 export async function getProductById(event: any) {
-    console.log(JSON.stringify(event))
+    console.log("Received event for GetProductById:", JSON.stringify(event, null, 2));
     // Extract productId from pathParameters
-    const {productId} = event.requestParameters;
+    const productId = event.productId;
 
     // Find the product by ID
     const product = products.find((product) => product.id === productId);
@@ -43,10 +41,6 @@ export async function getProductById(event: any) {
             body: JSON.stringify({ message: 'Product not found' }),
         };
     }
-
     // Return the product if found
-    return {
-        statusCode: 200,
-        body: JSON.stringify(product),
-    };
+    return product
 }
