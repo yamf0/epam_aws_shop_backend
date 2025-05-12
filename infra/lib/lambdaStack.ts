@@ -1,23 +1,42 @@
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import { Construct } from 'constructs';
+import {Construct} from 'constructs';
+import {RetentionDays} from "aws-cdk-lib/aws-logs";
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
-export class InfraStack extends cdk.Stack {
+export let getProductsListFunction : lambda.Function;
+export let getProductByIdFunction : lambda.Function;
+
+export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const getProductsListFunction = new lambda.Function(this, 'getProductsListFunction', {
+    getProductsListFunction = new lambda.Function(this, 'getProductsListFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'productService.getProducts',
-      code: lambda.Code.fromAsset('./lib'),
+      code: lambda.Code.fromAsset('./service'),
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        PRODUCT_TABLE_NAME: "products",
+        STOCK_TABLE_NAME: "stock",
+        LOG_LEVEL: 'INFO',
+      },
+      logRetention: RetentionDays.ONE_DAY
     });
 
-    const getProductByIdFunction = new lambda.Function(this, 'getProductByIdFunction', {
+    getProductByIdFunction = new lambda.Function(this, 'getProductByIdFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: 'productService.getProductById',
-        code: lambda.Code.fromAsset('./lib'),
+        code: lambda.Code.fromAsset('./service'),
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+          PRODUCT_TABLE_NAME: "products",
+          STOCK_TABLE_NAME: "stock",
+        LOG_LEVEL: 'INFO',
+      },
+      logRetention: RetentionDays.ONE_DAY
         });
 
 
@@ -115,6 +134,22 @@ export class InfraStack extends cdk.Stack {
       value: api.url,
       description: 'The base URL for the Products API',
     });
-  }
 
+    // Dynamo Stack
+    const productsTable = dynamodb.Table.fromTableName(
+        this,
+        'ImportedProductsTable',
+        'products'  // The actual table name in AWS
+    );
+    const stockTable = dynamodb.Table.fromTableName(
+        this,
+        'ImportedStockTable',
+        'stock'
+    )
+
+    productsTable.grantReadData(getProductsListFunction);
+    stockTable.grantReadData(getProductsListFunction);
+    productsTable.grantReadData(getProductByIdFunction);
+    stockTable.grantReadData(getProductByIdFunction);
+  }
 }
