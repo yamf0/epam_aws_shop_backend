@@ -1,24 +1,66 @@
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
-import { Construct } from 'constructs';
+import {Construct} from 'constructs';
+import {RetentionDays} from "aws-cdk-lib/aws-logs";
+import {ProductModel} from "./model/ProductModel";
+import {Code, Runtime} from "aws-cdk-lib/aws-lambda";
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
-export class InfraStack extends cdk.Stack {
+export let getProductsListFunction : lambda.Function;
+export let getProductByIdFunction : lambda.Function;
+
+export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const getProductsListFunction = new lambda.Function(this, 'getProductsListFunction', {
+    const layer = new lambda.LayerVersion(this, 'NodeLayer', {
+      code: Code.fromAsset('./lib/layer'),
+      compatibleRuntimes: [Runtime.NODEJS_20_X],
+      layerVersionName: "NodeLayer",
+    })
+
+    getProductsListFunction = new lambda.Function(this, 'getProductsListFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'productService.getProducts',
-      code: lambda.Code.fromAsset('./lib'),
+      code: lambda.Code.fromAsset('./service'),
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        PRODUCT_TABLE_NAME: "products",
+        STOCK_TABLE_NAME: "stock",
+        LOG_LEVEL: 'INFO',
+      },
+      logRetention: RetentionDays.ONE_DAY,
+      layers: [layer],
     });
 
-    const getProductByIdFunction = new lambda.Function(this, 'getProductByIdFunction', {
+    getProductByIdFunction = new lambda.Function(this, 'getProductByIdFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: 'productService.getProductById',
-        code: lambda.Code.fromAsset('./lib'),
-        });
+        code: lambda.Code.fromAsset('./service'),
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+          PRODUCT_TABLE_NAME: "products",
+          STOCK_TABLE_NAME: "stock",
+        LOG_LEVEL: 'INFO',
+      },
+      logRetention: RetentionDays.ONE_DAY,
+      layers: [layer],
+    });
+
+    const createProductFunction = new lambda.Function(this, 'createProductFunction', {
+      runtime: lambda.Runtime.NODEJS_20_X,
+      handler: 'productService.createProduct',
+      code: lambda.Code.fromAsset('./service'),
+      timeout: cdk.Duration.seconds(30),
+      environment: {
+        PRODUCT_TABLE_NAME: "products",
+        LOG_LEVEL: 'INFO',
+      },
+      logRetention: RetentionDays.ONE_DAY,
+      layers: [layer],
+    });
 
 
     // API GateWay
@@ -26,6 +68,31 @@ export class InfraStack extends cdk.Stack {
       restApiName: "Shop API Gateway",
       description: "This API serves the Lambda functions."
     });
+
+    api.addModel("ProductModel", ProductModel)
+
+    const createProductIntegration = new apigateway.LambdaIntegration(createProductFunction, {
+      integrationResponses: [
+        {
+          statusCode: "201",
+          responseTemplates: {
+            'application/json': '$input.json("$")'
+          },
+          responseParameters: {
+            'method.response.header.Access-Control-Allow-Origin': "'*'",
+          }
+        }
+      ],
+      requestTemplates: {
+        'application/json': JSON.stringify({
+          body: '$util.escapeJavaScript($input.body)',
+          headers: {
+            'Content-Type': "'application/json'"
+          }
+        })
+      },
+      proxy: false
+    })
 
     const getProductsListIntegration = new apigateway.LambdaIntegration(getProductsListFunction, {
       integrationResponses:[
@@ -90,6 +157,22 @@ export class InfraStack extends cdk.Stack {
         }
       ]
     });
+    productsResource.addMethod('POST', createProductIntegration, {
+      methodResponses: [
+        {
+          statusCode: '201',
+          responseParameters: {
+            'method.response.header.Access-Control-Allow-Origin': true,
+          }
+        },
+        {
+          statusCode: '400',
+          responseParameters: {
+            'method.response.header.Access-Control-Allow-Origin': true,
+          }
+        }
+      ],
+    })
     productByIdResource.addMethod('GET', getProductByIdIntegration, {
       methodResponses: [
         {
@@ -104,9 +187,6 @@ export class InfraStack extends cdk.Stack {
             'method.response.header.Access-Control-Allow-Origin': true,
           },
         }],
-      requestParameters: {
-        'method.request.path.productId': true
-      },
     });
 
     // --- Output ---
@@ -115,6 +195,23 @@ export class InfraStack extends cdk.Stack {
       value: api.url,
       description: 'The base URL for the Products API',
     });
-  }
 
+    // Dynamo Stack
+    const productsTable = dynamodb.Table.fromTableName(
+        this,
+        'ImportedProductsTable',
+        'products'  // The actual table name in AWS
+    );
+    const stockTable = dynamodb.Table.fromTableName(
+        this,
+        'ImportedStockTable',
+        'stock'
+    )
+
+    productsTable.grantReadData(getProductsListFunction);
+    stockTable.grantReadData(getProductsListFunction);
+    productsTable.grantReadData(getProductByIdFunction);
+    stockTable.grantReadData(getProductByIdFunction);
+    productsTable.grantWriteData(createProductFunction);
+  }
 }
