@@ -9,8 +9,10 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "cdk:deploy": "npm run build && cdk deploy",
-    "cdk:destroy": "cdk destroy"
+    "cdk:deploy:dynamo": "npm run build && cdk deploy DynamoStack",
+    "cdk:deploy:lambda": "npm run build && cdk deploy LambdaStack",
+    "cdk:deploy": "npm run build && cdk deploy --all",
+    "cdk:destroy": "cdk destroy --all"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
@@ -24,7 +26,9 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.806.0",
     "@aws-sdk/lib-dynamodb": "^3.806.0",
+    "@types/uuid": "^10.0.0",
     "aws-cdk-lib": "2.190.0",
-    "constructs": "^10.0.0"
+    "constructs": "^10.0.0",
+    "uuid": "^11.1.0"
   }
 }

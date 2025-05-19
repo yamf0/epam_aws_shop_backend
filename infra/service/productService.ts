@@ -1,5 +1,7 @@
 import {DynamoDBClient} from "@aws-sdk/client-dynamodb";
-import {DynamoDBDocumentClient, QueryCommand, ScanCommand} from "@aws-sdk/lib-dynamodb"
+import {DynamoDBDocumentClient, PutCommand, PutCommandInput, QueryCommand, ScanCommand} from "@aws-sdk/lib-dynamodb"
+import { v4 as uuidv4 } from 'uuid';
+
 
 const dynamoDB = new DynamoDBClient({ region: process.env.AWS_REGION });
 const documentClient = DynamoDBDocumentClient.from(dynamoDB);
@@ -43,7 +45,7 @@ export async function getProductById(event: any) {
         TableName: productTable,
         KeyConditionExpression: 'id = :productId',
         ExpressionAttributeValues: {
-            ':productId': parseInt(productId)
+            ':productId': productId
         }
     })
 
@@ -70,6 +72,40 @@ export async function getProductById(event: any) {
 
 }
 
+export async function createProduct(event: any) {
+    console.log("Received event for CreateProduct:", JSON.stringify(event, null, 2));
+
+    if (!event.body) {
+        throw new Error("Invalid requestBody");
+    }
+
+    const body = JSON.parse(event.body);
+    const product: Product = {
+        ...body,
+        id: uuidv4()
+    }
+
+    console.log("Product", product)
+
+    try {
+        const insertParams: PutCommandInput = {
+            TableName: productTable,
+            Item: product
+        }
+
+        const putResponse = await documentClient.send(new PutCommand(insertParams))
+        console.log("Response:", JSON.stringify(putResponse));
+        return {
+            statusCode: 201,
+            body: product
+        }
+    }
+    catch (e) {
+        console.log(e)
+        throw e;
+    }
+}
+
 async function mergeWithStock(product: Product): Promise<ProductStock | undefined> {
     console.log("Merging product", product.id);
 
@@ -85,10 +121,9 @@ async function mergeWithStock(product: Product): Promise<ProductStock | undefine
         const productResponse = await documentClient.send(query)
         const stocks = productResponse.Items![0]
         console.log("Stock of product ", JSON.stringify(stocks))
-
         return {
             ...product,
-            ...stocks
+            count: stocks ? stocks.count : 0
         } as ProductStock
     }
     catch (e) {

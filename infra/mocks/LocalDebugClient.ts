@@ -1,4 +1,4 @@
-import {getProductById, getProducts} from "../service/productService";
+import {createProduct, getProductById, getProducts} from "../service/productService";
 import {DynamoDBClient} from "@aws-sdk/client-dynamodb";
 import {DynamoDBDocumentClient} from "@aws-sdk/lib-dynamodb";
 
@@ -12,4 +12,8 @@ const documentClient = DynamoDBDocumentClient.from(client);
     console.log(product);
 })*/
 
-getProducts().then(products => {console.log(products)})
+// getProducts().then(products => {console.log(products)})
+
+createProduct({body: JSON.stringify({title: "myTitle", description: "myDescription", price: 1})}).then((result) => {
+    console.log(result);
+})
