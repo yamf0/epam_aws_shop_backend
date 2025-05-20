@@ -5,23 +5,12 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import {Construct} from 'constructs';
 import {RetentionDays} from "aws-cdk-lib/aws-logs";
 import {ProductModel} from "./model/ProductModel";
-import {Code, Runtime} from "aws-cdk-lib/aws-lambda";
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
-
-export let getProductsListFunction : lambda.Function;
-export let getProductByIdFunction : lambda.Function;
 
 export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const layer = new lambda.LayerVersion(this, 'NodeLayer', {
-      code: Code.fromAsset('./lib/layer'),
-      compatibleRuntimes: [Runtime.NODEJS_20_X],
-      layerVersionName: "NodeLayer",
-    })
-
-    getProductsListFunction = new lambda.Function(this, 'getProductsListFunction', {
+    const getProductsListFunction = new lambda.Function(this, 'getProductsListFunction', {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'productService.getProducts',
       code: lambda.Code.fromAsset('./service'),
@@ -32,10 +21,9 @@ export class LambdaStack extends cdk.Stack {
         LOG_LEVEL: 'INFO',
       },
       logRetention: RetentionDays.ONE_DAY,
-      layers: [layer],
     });
 
-    getProductByIdFunction = new lambda.Function(this, 'getProductByIdFunction', {
+    const getProductByIdFunction = new lambda.Function(this, 'getProductByIdFunction', {
         runtime: lambda.Runtime.NODEJS_20_X,
         handler: 'productService.getProductById',
         code: lambda.Code.fromAsset('./service'),
@@ -46,7 +34,6 @@ export class LambdaStack extends cdk.Stack {
         LOG_LEVEL: 'INFO',
       },
       logRetention: RetentionDays.ONE_DAY,
-      layers: [layer],
     });
 
     const createProductFunction = new lambda.Function(this, 'createProductFunction', {
@@ -59,7 +46,6 @@ export class LambdaStack extends cdk.Stack {
         LOG_LEVEL: 'INFO',
       },
       logRetention: RetentionDays.ONE_DAY,
-      layers: [layer],
     });
 
 
