@@ -16,7 +16,8 @@ export class ImportServiceStack extends cdk.Stack {
         const bucket = new s3.Bucket(this, 'importBucket', {
             removalPolicy: cdk.RemovalPolicy.DESTROY, // Note: only use DESTROY for development
             bucketName: S3_BUCKET_NAME,
-            versioned: true,
+            versioned: false,
+            autoDeleteObjects: true,
         });
 
         const importProductsFile = new lambda.Function(this, 'importProductsFileFunction', {
